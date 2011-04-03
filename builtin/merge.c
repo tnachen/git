@@ -1090,9 +1090,6 @@ int cmd_merge(int argc, const char **argv, const char *prefix)
 		 * to forbid "git merge" into a branch yet to be born.
 		 * We do the same for "git pull".
 		 */
-		if (argc != 1)
-			die(_("Can merge only exactly one commit into "
-				"empty head"));
 		if (squash)
 			die(_("Squash commit into empty head not supported yet"));
 		if (!allow_fast_forward)
@@ -1101,36 +1098,44 @@ int cmd_merge(int argc, const char **argv, const char *prefix)
 		remote_head = peel_to_type(argv[0], 0, NULL, OBJ_COMMIT);
 		if (!remote_head)
 			die(_("%s - not something we can merge"), argv[0]);
-		read_empty(remote_head->sha1, 0);
 		update_ref("initial pull", "HEAD", remote_head->sha1, NULL, 0,
 				DIE_ON_ERR);
-		return 0;
-	} else {
-		struct strbuf merge_names = STRBUF_INIT;
 
-		/* We are invoked directly as the first-class UI. */
-		head_arg = "HEAD";
+		if (argc < 2)
+			return 0;
 
-		/*
-		 * All the rest are the commits being merged;
-		 * prepare the standard merge summary message to
-		 * be appended to the given message.  If remote
-		 * is invalid we will die later in the common
-		 * codepath so we discard the error in this
-		 * loop.
-		 */
-		for (i = 0; i < argc; i++)
-			merge_name(argv[i], &merge_names);
-
-		if (!have_message || shortlog_len) {
-			fmt_merge_msg(&merge_names, &merge_msg, !have_message,
-				      shortlog_len);
-			if (merge_msg.len)
-				strbuf_setlen(&merge_msg, merge_msg.len - 1);
-		}
+		hashcpy(head, remote_head->sha1);
+		read_empty(remote_head->sha1, 0);
+		head_arg = argv[0];
+		argc--;
+		argv++;
 	}
 
-	if (head_invalid || !argc)
+	struct strbuf merge_names = STRBUF_INIT;
+
+	/* We are invoked directly as the first-class UI. */
+	if(!head_invalid)
+		head_arg = "HEAD";
+
+	/*
+	 * All the rest are the commits being merged;
+	 * prepare the standard merge summary message to
+	 * be appended to the given message.  If remote
+	 * is invalid we will die later in the common
+	 * codepath so we discard the error in this
+	 * loop.
+	 */
+	for (i = 0; i < argc; i++)
+		merge_name(argv[i], &merge_names);
+
+	if (!have_message || shortlog_len) {
+		fmt_merge_msg(&merge_names, &merge_msg, !have_message,
+				  shortlog_len);
+		if (merge_msg.len)
+			strbuf_setlen(&merge_msg, merge_msg.len - 1);
+	}
+
+	if (!argc)
 		usage_with_options(builtin_merge_usage,
 			builtin_merge_options);
 
